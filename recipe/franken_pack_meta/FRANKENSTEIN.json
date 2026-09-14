@@ -1,0 +1,44 @@
+{
+  "frankenstein": true,
+  "base_pack": "/root/workspace/GLM-5.3-Flash-exl3-3.05bpw",
+  "upgraded_layers": [
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15
+  ],
+  "override_tensors": 69120,
+  "rewritten_shards": [
+    "model-00001-of-00015.safetensors",
+    "model-00002-of-00015.safetensors",
+    "model-00003-of-00015.safetensors",
+    "model-00004-of-00015.safetensors",
+    "model-00005-of-00015.safetensors",
+    "model-00006-of-00015.safetensors",
+    "model-00007-of-00015.safetensors"
+  ],
+  "source": "turboderp/GLM-5.3-Flash-exl3@4.05bpw expert tensors (K=4)",
+  "note": "layers in upgraded_layers are K=4 from the 4.05bpw branch; reverted_to_K3 were rolled back to the 3.05 donor to make 1M + MTP fit",
+  "reverted_to_K3": [
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22
+  ],
+  "effective_expert_bpw": 3.333,
+  "serves": "glm53-sec.service @ 1M fp16 KV + MTP depth<=3, gpu_split [91,57] + draft [0,5]",
+  "bpw_measured": 3.3574,
+  "upgraded_layer_count": 13
+}

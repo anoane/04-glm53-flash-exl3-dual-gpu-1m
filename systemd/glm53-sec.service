@@ -1,0 +1,37 @@
+[Unit]
+Description=GLM-5.3-Flash UNCENSORED franken-13L (exl3 3.3732bpw, 1M fp16 KV, MTP d1) for sec.example.invalid:8443
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/root/rnd/tabby-fresh
+
+# exllamav3 1.4.9 lives in /root/workspace/exl3-venv. The tabby venv (/root/rnd/tabbylatest)
+# has 1.4.1, which has NO glm5_next and cannot load this pack -- do not switch back to it.
+Environment=PYTHONPATH=/root/rnd/tabby-fresh
+Environment=HF_HUB_OFFLINE=1
+Environment=TOKENIZERS_PARALLELISM=false
+
+# Thermal policy. A sustained 1M prefill at 400/200 W pins cuda:0 at 80 C and makes the
+# guard oscillate (it logged 6 derate/recover cycles in 7 minutes). A steady 300/150 W cap
+# holds 61-72 C with zero guard events, costing ~14% prefill throughput (1026 vs 1199 tok/s).
+# The passively cooled CMP is the limiting part: it reached 80 C memory even capped, during a
+# long generation sweep.
+ExecStartPre=/usr/bin/nvidia-smi -i 0 -pl 300
+ExecStartPre=/usr/bin/nvidia-smi -i 1 -pl 150
+
+ExecStart=/root/workspace/exl3-venv/bin/python /root/rnd/tabby-fresh/main.py --config /root/serve/glm53-sec.yml
+
+# Leave the caps in place on stop; the thermal guard owns escalation from here.
+ExecStopPost=/usr/bin/nvidia-smi -i 0 -pl 400
+ExecStopPost=/usr/bin/nvidia-smi -i 1 -pl 200
+
+Restart=on-failure
+RestartSec=30
+TimeoutStartSec=900
+TimeoutStopSec=120
+KillSignal=SIGINT
+
+[Install]
+WantedBy=multi-user.target

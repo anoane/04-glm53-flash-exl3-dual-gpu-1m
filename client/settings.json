@@ -1,0 +1,11 @@
+{
+  "defaultThinkingLevel": "max",
+  "compaction": {
+    "enabled": true,
+    "reserveTokens": 65536
+  },
+  "lastChangelogVersion": "0.85.1",
+  "theme": "dark",
+  "defaultProvider": "glm53sec",
+  "defaultModel": "GLM-5.3-Flash-Uncensored-franken-13L"
+}

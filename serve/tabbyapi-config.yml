@@ -1,0 +1,140 @@
+# GLM-5.3-Flash frankenstein 13L -- production serving config for sec.example.invalid:8443
+#
+# WHAT THIS ACTUALLY IS (the old Caddy comment and the pi.dev block were wrong):
+#   base pack  : GLM-5.3-Flash-exl3 3.05bpw (turboderp)
+#   modified   : expert tensors for layers 3..15 replaced with K=4 from the 4.05bpw branch
+#   effective  : 3.3574 bpw measured whole-pack, 127.55 GiB -- NOT 4.05bpw
+#   directory  : GLM-5.3-Flash-franken-20L -- HISTORICAL NAME, it holds 13 upgraded layers.
+#                Do not "fix" it: tabby reports the directory name as the model id and
+#                clients are configured against GLM-5.3-Flash-franken-20L.
+#   layer pick : activation-noise sensitivity sweep (4 runs agreed the top set is [3..22]);
+#                only the first 13 were affordable in VRAM, so [3..15] is the sweep order
+#                truncated by fit, not a different ranking. NOT a .exl3moe "code_injection"
+#                profile (those are CPU-offload residency profiles, unused -- nothing is
+#                offloaded).
+#   quality    : vs plain 3.05, paired NLL -0.30% (t=-1.91, CI straddles zero) over 40,950
+#                positions. Top-1 agreement 92.91%, flips confined to the low-margin tail.
+#                Treat as "not worse, marginally better", not a quality upgrade.
+#
+# VRAM (measured, real 1,040,000-token fill through the serving path, MTP resident,
+# mh=3 headroom reserved but unspent):
+#   cuda:0 94,844/97,887 MiB (2.97 GiB free)   cuda:1 60,020/65,536 MiB (5.39 GiB free)
+#   -> SINGLE STREAM ONLY. max_batch_size MUST stay 1.
+#   Peak is reached at ~12k tokens and stays FLAT through the whole 1M walk: the binding
+#   constraint is allocation-time, not fill-time.
+#   14 layers ([3..16]) FAILS at 46/50 modules. 13 is the ceiling. See fallbacks.md.
+#
+# Auth is terminated by Caddy (bearer tokens live in /etc/caddy/Caddyfile), so this binds
+# loopback only and runs with auth disabled. Do not expose 1919 off-host.
+
+network:
+  host: 127.0.0.1          # Caddy reverse_proxy localhost:1919 handles TLS + bearer auth
+  port: 1919
+  disable_auth: true       # auth is at the edge; never bind this to 0.0.0.0
+  disable_fetch_requests: true
+  send_tracebacks: false
+  api_servers: ["OAI"]
+
+logging:
+  log_prompt: false        # security review content -- do not log prompts
+  log_generation_params: false
+  log_requests: true
+
+model:
+  # Dedicated dir with a single symlink: model_dir is ENUMERATED for /v1/models, so
+  # pointing it at /root/workspace advertised every directory there (laguna-nvfp4-560k,
+  # _drafters, franken_405_meta, exl3build, CrispASR ...). dummy_model_names only ADDS
+  # fake entries, it cannot filter. A symlink farm is the clean fix.
+  model_dir: /root/serve/models
+  model_name: GLM-5.3-Flash-Uncensored-franken-13L
+  backend: exllamav3
+
+  # 1M context, fp16 KV. cache_mode omitted on purpose: default is FP16.
+  # 8-bit KV would only save 0.65 GiB at 128k and is not needed.
+  # FULL 1M fp16 KV *WITH* MTP -- verified running, 953 s for a 1,040,000-token fill.
+  # SUPERSEDED CLAIM, kept so it is not re-derived: "1M + MTP is structurally infeasible".
+  # That came from three loads failing at 46/50 and 49/50 modules, but the cause was
+  # load ORDER plus an unpinned draft: tabby loads the draft FIRST
+  # (model.py:709-716, use_per_device=draft_gpu_split or None) and an unset draft_gpu_split
+  # is falsy -> None -> AUTOSPLIT, so the MTP head scattered across both cards and ate
+  # budget the trunk needed. Pinning draft_gpu_split: [0, 5] confines it to cuda:1 and
+  # 1M + MTP fits. The fix was pinning the draft, not dropping context.
+  max_seq_len: 1048576
+  cache_size: 1048576
+
+  max_batch_size: 1        # measured constraint, not a preference (see VRAM note above)
+  chunk_size: 2048         # matches the 2048-token chunking all prefill numbers were taken at
+
+  # gpu_split is routed to exllamav3 use_per_device as an ABSOLUTE GiB cap.
+  # [93,60] is the only balanced feasible point: [92,61] OOMs cuda:1,
+  # [94,58] fails the split, [94,59] fits but leaves cuda:0 2.02 GiB and thrashes
+  # the allocator down to 16 tok/s.
+  gpu_split_auto: false
+  # MEASURED: the MTP draft costs 4.676 GiB on cuda:1 at a 1M cache (draft_footprint.py).
+  # tabby loads the draft FIRST, so that is carved out before the trunk asks -- leaving
+  # ~58.4 for the trunk on cuda:1, while the trunk wanted 61.52 there in the harness
+  # (which loaded trunk-first). Deficit ~3.1 GiB -> the trunk died at module 46/50.
+  # Fix: shift the split boundary so less trunk lands on the small card. cuda:0 peaked at
+  # 93.22/95.01 at full 1M, so 94 is within the card.
+  # WATCH: [94,59] previously fit but left cuda:0 ~2 GiB and thrashed decode to 16 tok/s,
+  # so verify decode speed after loading, not just that it loads.
+  # Rebalanced after the 503s: at peak cuda:0 had only 0.60 GiB free while cuda:1 had 5.98
+  # free, i.e. 6.58 GiB free globally -- a PLACEMENT failure, not a capacity one. Give cuda:0
+  # ~4 GiB of activation headroom instead of 1. cuda:1 = 57 trunk + 5 draft = 62 of 63.39.
+  gpu_split: [91, 57]
+
+  # GLM-5.3 emits a raw reasoning trace closed by a bare </think>.
+  reasoning: true
+  # GLM-5.3 emits <tool_call>NAME<arg_key>k</arg_key><arg_value>v</arg_value></tool_call>.
+  # That is the glm4_5 parser's exact format (aliases: glm4_6/glm4_7/laguna/poolside_v1).
+  # WITHOUT this, tabby returns the raw XML as content and tool_calls stays null.
+  tool_format: glm4_5
+  reasoning_start_token: "<think>"
+  reasoning_end_token: "</think>"
+  start_in_reasoning: always
+  template_vars_default:
+    thinking: true
+    reasoning_effort: high   # pi.dev maps medium/high -> "high", xhigh/max -> "max"
+
+draft_model:
+  # MTP head ships inside the same pack (mtp.safetensors, outside the index, found by glob).
+  # draft_mode: mtp reuses the main model dir and loads component="mtp".
+  # RE-ENABLED after reverting layers 19-22 to K=3, which freed 4 x 0.8438 = 3.38 GiB of
+  # weights and so cut the spill onto cuda:1. The previous 1M+MTP attempt died one module
+  # short (49/50), so this is several modules of slack. Upgraded block is now [3..18].
+  draft_mode: mtp
+
+  # CRITICAL: tabby loads the DRAFT FIRST (model.py:709-716) with
+  # use_per_device=draft_gpu_split or None. Left unset it defaults to [] -> None ->
+  # AUTOSPLIT across both cards, which eats budget the trunk then needs and fails with
+  # "Insufficient VRAM in split for model and cache". Pin it to cuda:1 only, matching the
+  # validated harness (draft.load(device="cuda:1")). A 0 entry excludes a device.
+  # MEASURED standalone: 4.676 GiB on cuda:1 with a 1M draft cache (model.py:381 sizes it
+  # with max_num_tokens=cache_size, i.e. the FULL 1M). 5 GiB = measured + 0.3 margin.
+  # autosplit_reserve is forced to None whenever an explicit gpu_split is set
+  # (model.py:45, "Causes crash if set with GPU split"), so these caps are the real caps.
+  # MTP head here is IN-INDEX (layer 45) and measures 3.533 GiB, vs 2.666 GiB for the
+  # old censored sibling mtp.safetensors. Draft need = head 3.533 + 1M draft cache ~1.26
+  # = ~4.79 GiB, so the old [0, 5] cap failed in the DRAFT load before the trunk began.
+  draft_gpu_split: [0, 6]
+  # SERVE depth 1 (faster: 76-96% acceptance vs ~52% at depth 3 on long context), while the
+  # VRAM budget RESERVES depth-3 space. That reservation costs only 0.265 GiB: KDA state is
+  # (bsz, mh+1, 64, 128, 128) fp32 = 4 MiB/layer/slot x 34 layers, so mh=1 = 0.266 GiB and
+  # mh=3 = 0.531 GiB. We leave that 0.265 GiB unspent, so raising draft_num_tokens to 3 later
+  # is a config change and not a re-fit.
+  draft_num_tokens: 1        # MEASURED: depth 1 is FASTER. long_code 59.3 tok/s @85.2% vs
+                             # depth2 53.7 @66.3% vs depth3 48.8 @53.2% (= base).
+                             # A 200-token snippet flattered depth 2; matched 400-token
+                             # runs reverse it. Do not raise this without re-measuring.
+  dynamic_draft: false
+
+memory:
+  # NOT an offload switch -- this is the system-RAM stash for RECURRENT CHECKPOINTS.
+  # model.py:759 passes it as RecurrentCache(max_size=sysmem_recurrent_cache*1024**2).
+  # Setting 0 made max_size=0, so put() could never fit a single 136 MiB checkpoint
+  # (34 KDA layers x 4 MiB fp32 state); the evict loop then hit popitem() on an empty
+  # dict -> KeyError: 'dictionary is empty' -> HTTP 503 on any ~4k-token prompt.
+  # 4096 MB holds ~30 checkpoints at 136 MiB each, ample for single-stream review.
+  sysmem_recurrent_cache: 4096
+  sysmem_kv_cache: 0
+  cuda_malloc_async: true

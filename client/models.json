@@ -1,0 +1,137 @@
+{
+  "providers": {
+    "ds4": {
+      "name": "DS4-Flash-0731 (max quality, 7.15 GiB pool)",
+      "baseUrl": "https://ds4.example.invalid:8443/v1",
+      "apiKey": "<API_TOKEN>",
+      "api": "openai-completions",
+      "models": [
+        {
+          "id": "deepseek-v4-flash",
+          "name": "DS4-Flash-0731 max-quality (7.15 GiB pool)",
+          "reasoning": true,
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          },
+          "input": [
+            "text"
+          ],
+          "contextWindow": 262144,
+          "maxTokens": 65536,
+          "thinkingLevelMap": {
+            "off": "none",
+            "minimal": "minimal",
+            "low": "low",
+            "medium": "medium",
+            "high": "high",
+            "xhigh": "xhigh",
+            "max": "max"
+          },
+          "compat": {
+            "supportsReasoningEffort": false,
+            "supportsDeveloperRole": false,
+            "supportsUsageInStreaming": true,
+            "requiresToolResultName": false,
+            "maxTokensField": "max_tokens",
+            "thinkingFormat": "chat-template",
+            "chatTemplateKwargs": {
+              "thinking": {
+                "$var": "thinking.enabled"
+              },
+              "reasoning_effort": {
+                "$var": "thinking.effort"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "glm53sec": {
+      "name": "GLM-5.3-Flash exl3 Uncensored franken-13L (security code review, 1M ctx)",
+      "baseUrl": "https://sec.example.invalid:8443/v1",
+      "apiKey": "<API_TOKEN>",
+      "api": "openai-completions",
+      "models": [
+        {
+          "id": "GLM-5.3-Flash-Uncensored-franken-13L",
+          "name": "GLM-5.3-Flash UNCENSORED 3.3732bpw franken-13L (1M ctx, MTP<=3)",
+          "reasoning": true,
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          },
+          "input": [
+            "text"
+          ],
+          "contextWindow": 1048576,
+          "maxTokens": 65536,
+          "thinkingLevelMap": {
+            "off": "low",
+            "minimal": "low",
+            "low": "low",
+            "medium": "high",
+            "high": "high",
+            "xhigh": "max",
+            "max": "max"
+          },
+          "compat": {
+            "supportsReasoningEffort": true,
+            "supportsDeveloperRole": false,
+            "supportsUsageInStreaming": false,
+            "requiresToolResultName": false,
+            "maxTokensField": "max_tokens",
+            "thinkingFormat": "separate-field",
+            "thinkingField": "reasoning_content"
+          }
+        }
+      ]
+    },
+    "ds41": {
+      "name": "DeepSeek-V4.1-Flash EXL3 3.0bpw (1M ctx, CMP expert tier)",
+      "baseUrl": "https://ds4.example.invalid:8443/v1",
+      "apiKey": "<API_TOKEN>",
+      "api": "openai-completions",
+      "models": [
+        {
+          "id": "ds41",
+          "name": "DeepSeek-V4.1-Flash 3.0bpw (1,048,576 ctx, 12 expert layers on CMP 170HX)",
+          "reasoning": true,
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          },
+          "input": [
+            "text"
+          ],
+          "contextWindow": 1048576,
+          "maxTokens": 65536,
+          "thinkingLevelMap": {
+            "off": "low",
+            "minimal": "low",
+            "low": "low",
+            "medium": "high",
+            "high": "high",
+            "xhigh": "max",
+            "max": "max"
+          },
+          "compat": {
+            "supportsReasoningEffort": false,
+            "supportsDeveloperRole": false,
+            "supportsUsageInStreaming": true,
+            "requiresToolResultName": false,
+            "maxTokensField": "max_tokens",
+            "thinkingFormat": "separate-field",
+            "thinkingField": "reasoning"
+          }
+        }
+      ]
+    }
+  }
+}
