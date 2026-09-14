@@ -17,7 +17,7 @@ this different from the DeepSeek-V4.1 setup, which streams experts from DDR5.
 | CPU | AMD Ryzen 9 9950X3D (16C/32T) — 24 vCPU passed to the guest |
 | RAM | 160 GiB DDR5 allocated to the guest (157 GiB usable) — **no swap, deliberately** |
 | GPU 0 | NVIDIA RTX PRO 6000 Blackwell Workstation — 97,887 MiB, `sm_120`, `10de:2bb1`, PCIe Gen5 x16 (~42 GB/s H2D measured), 400 W default limit / 600 W max |
-| GPU 1 | NVIDIA CMP 170HX — 65,536 MiB **after unlock** (8 GB stock), `sm_80` (GA100), `10de:20c2`, 200 W default limit / 250 W max. The unlocked card does **Gen2 x16** (tested in the x16 slot); in *this* build it occupies a PCIe 3.0 **x1** slot, so the link runs **Gen2 x1, ~0.38 GB/s** — see repo 01 §5 |
+| GPU 1 | NVIDIA CMP 170HX — 65,536 MiB after the [cmpunlocker](https://github.com/amoghmunikote/cmpunlocker) unlock (8 GB stock), `sm_80` (GA100), `10de:20c2`, 200 W default limit / 250 W max. The unlocked card does **Gen2 x16** (tested in the x16 slot); in *this* build it occupies a PCIe 3.0 **x1** slot, so the link runs **Gen2 x1, ~0.38 GB/s** — see repo 01 §5 |
 | Guest | Ubuntu 24.04.4 LTS, kernel 6.8.0-139-generic, NVIDIA driver 610.43.02 |
 | Storage | 5.8 TB NVMe (~93 GB free with all packs resident) |
 
